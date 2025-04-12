@@ -11,11 +11,14 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.rememberNavController
 import com.example.streamapp.ui.theme.StreamAppTheme
 
 class MainActivity : ComponentActivity() {
+
+    private val isPipMode = mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -27,7 +30,8 @@ class MainActivity : ComponentActivity() {
                     AppNavGraph(
                         navController = navController,
                         innerPadding = innerPadding,
-                        onEnterPip = { enterPipMode() }
+                        onEnterPip = { enterPipMode() },
+                        isPipMode = isPipMode.value
                     )
                 }
             }
@@ -43,6 +47,9 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+
+
+
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
         enterPipMode()
@@ -53,6 +60,7 @@ class MainActivity : ComponentActivity() {
         newConfig: Configuration
     ) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
-        // to handle ui changes(not done)
+        isPipMode.value = isInPictureInPictureMode
     }
+
 }

@@ -6,6 +6,7 @@ import android.util.Log
 import android.view.SurfaceView
 import android.view.ViewGroup
 import android.util.Rational
+import android.widget.FrameLayout
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -36,6 +37,7 @@ fun VideoPlayerPage(
     var isLoading by remember { mutableStateOf(true) }
     var surfaceView by remember { mutableStateOf<SurfaceView?>(null) }
     var hasAttachedSurface by remember { mutableStateOf(false) }
+    var isRecording by remember { mutableStateOf(false) }
 
     vlcPlayer.onError = { msg ->
         errorMessage = msg
@@ -44,7 +46,6 @@ fun VideoPlayerPage(
     vlcPlayer.onPlaying = {
         isLoading = false
     }
-
 
     LaunchedEffect(surfaceView) {
         if (!vlcPlayer.isInitialized) {
@@ -55,49 +56,80 @@ fun VideoPlayerPage(
             if (!hasAttachedSurface) {
                 vlcPlayer.attachSurface(surface)
                 hasAttachedSurface = true
+                vlcPlayer.playStream(streamUrl)
+                isLoading = true
             }
+        }
+    }
 
+    LaunchedEffect(isPiPMode) {
+        if (hasAttachedSurface && !vlcPlayer.isInitialized) {
+            vlcPlayer.initialize()
+        }
+
+        if (hasAttachedSurface && vlcPlayer.isInitialized &&
+            (isPiPMode || !isMediaPlayerActive(vlcPlayer))) {
             vlcPlayer.playStream(streamUrl)
             isLoading = true
         }
     }
 
-
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_PAUSE -> vlcPlayer.stopPlayback()
-                Lifecycle.Event.ON_DESTROY -> vlcPlayer.release()
+                Lifecycle.Event.ON_PAUSE -> {
+                    if (!isPiPMode) {
+                        vlcPlayer.stopPlayback()
+                    }
+                }
+                Lifecycle.Event.ON_RESUME -> {
+                    if (hasAttachedSurface && vlcPlayer.isInitialized &&
+                        !isMediaPlayerActive(vlcPlayer)) {
+                        vlcPlayer.playStream(streamUrl)
+                        isLoading = true
+                    }
+                }
+                Lifecycle.Event.ON_DESTROY -> {
+                    hasAttachedSurface = false
+                    vlcPlayer.release()
+                }
                 else -> {}
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
+            hasAttachedSurface = false
             vlcPlayer.release()
         }
     }
-
 
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(Color.Black)
     ) {
-
         AndroidView(
             factory = { ctx ->
-                SurfaceView(ctx).apply {
+                FrameLayout(ctx).apply {
                     layoutParams = ViewGroup.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.MATCH_PARENT
                     )
-                    surfaceView = this
+
+                    val surface = SurfaceView(ctx).apply {
+                        layoutParams = FrameLayout.LayoutParams(
+                            FrameLayout.LayoutParams.MATCH_PARENT,
+                            FrameLayout.LayoutParams.MATCH_PARENT
+                        ).apply {
+                            gravity = android.view.Gravity.CENTER
+                        }
+                    }
+                    addView(surface)
+                    surfaceView = surface
                 }
             },
             modifier = Modifier.fillMaxSize()
         )
-
 
         errorMessage?.let {
             Box(
@@ -114,7 +146,6 @@ fun VideoPlayerPage(
             }
         }
 
-        // Show loading spinner while buffering
         if (isLoading) {
             Box(
                 modifier = Modifier.fillMaxSize(),
@@ -123,7 +154,6 @@ fun VideoPlayerPage(
                 CircularProgressIndicator(color = Color.White)
             }
         }
-
 
         if (!isPiPMode) {
             Column(
@@ -139,9 +169,6 @@ fun VideoPlayerPage(
                 )
             }
 
-            var isRecording by remember { mutableStateOf(false) }
-
-            // Buttons and other UI controls, only show them when NOT in PiP mode
             Row(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
@@ -164,7 +191,6 @@ fun VideoPlayerPage(
                 }
             }
 
-            //  (PiP) button
             Row(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
@@ -185,4 +211,8 @@ fun VideoPlayerPage(
             }
         }
     }
+}
+
+private fun isMediaPlayerActive(vlcPlayer: VlcPlayer): Boolean {
+    return vlcPlayer.isInitialized
 }

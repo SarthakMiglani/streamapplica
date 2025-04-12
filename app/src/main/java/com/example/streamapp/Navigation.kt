@@ -31,7 +31,8 @@ object AppRoutes {
 fun AppNavGraph(
     navController: NavHostController,
     innerPadding: PaddingValues,
-    onEnterPip: () -> Unit
+    onEnterPip: () -> Unit,
+    isPipMode: Boolean = false
 ) {
     NavHost(
         navController = navController,
@@ -48,8 +49,10 @@ fun AppNavGraph(
             val streamUrl = backStackEntry.arguments?.getString("streamUrl") ?: ""
             VideoPlayerPage(
                 streamUrl = streamUrl,
-                onEnterPip = onEnterPip
+                onEnterPip = onEnterPip,
+                isPiPMode = isPipMode
             )
         }
     }
 }
+
